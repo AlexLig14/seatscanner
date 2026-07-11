@@ -1,5 +1,12 @@
 export type EventCategory = "concert" | "sports";
 
+export type PlatformName = "SeatGeek" | "Ticketmaster" | "Vivid Seats" | "StubHub";
+
+export interface PlatformPrice {
+  platform: PlatformName;
+  price: number; // price on this platform in USD
+}
+
 export interface SeatEvent {
   id: string;
   name: string;
@@ -8,7 +15,8 @@ export interface SeatEvent {
   time: string; // e.g. "7:30 PM"
   venue: string;
   city: string; // e.g. "East Rutherford, NJ"
-  fromPrice: number; // cheapest available price in USD
+  fromPrice: number; // cheapest available price in USD (matches the lowest platform price)
+  platforms: PlatformPrice[]; // per-platform prices — swap for real API data later
 }
 
 // Hardcoded mock data — swap this out for real API results later.
@@ -22,6 +30,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "MetLife Stadium",
     city: "East Rutherford, NJ",
     fromPrice: 285,
+    platforms: [
+      { platform: "SeatGeek", price: 285 },
+      { platform: "Ticketmaster", price: 319 },
+      { platform: "Vivid Seats", price: 298 },
+      { platform: "StubHub", price: 305 },
+    ],
   },
   {
     id: "knicks-vs-celtics-msg",
@@ -32,6 +46,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "Madison Square Garden",
     city: "New York, NY",
     fromPrice: 145,
+    platforms: [
+      { platform: "SeatGeek", price: 162 },
+      { platform: "Ticketmaster", price: 145 },
+      { platform: "Vivid Seats", price: 158 },
+      { platform: "StubHub", price: 151 },
+    ],
   },
   {
     id: "zach-bryan-fenway",
@@ -42,6 +62,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "Fenway Park",
     city: "Boston, MA",
     fromPrice: 96,
+    platforms: [
+      { platform: "SeatGeek", price: 104 },
+      { platform: "Ticketmaster", price: 112 },
+      { platform: "Vivid Seats", price: 96 },
+      { platform: "StubHub", price: 99 },
+    ],
   },
   {
     id: "lakers-vs-warriors-crypto",
@@ -52,6 +78,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "Crypto.com Arena",
     city: "Los Angeles, CA",
     fromPrice: 175,
+    platforms: [
+      { platform: "SeatGeek", price: 189 },
+      { platform: "Ticketmaster", price: 199 },
+      { platform: "Vivid Seats", price: 182 },
+      { platform: "StubHub", price: 175 },
+    ],
   },
   {
     id: "billie-eilish-united-center",
@@ -62,6 +94,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "United Center",
     city: "Chicago, IL",
     fromPrice: 112,
+    platforms: [
+      { platform: "SeatGeek", price: 112 },
+      { platform: "Ticketmaster", price: 128 },
+      { platform: "Vivid Seats", price: 119 },
+      { platform: "StubHub", price: 122 },
+    ],
   },
   {
     id: "cowboys-vs-eagles-att",
@@ -72,6 +110,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "AT&T Stadium",
     city: "Arlington, TX",
     fromPrice: 210,
+    platforms: [
+      { platform: "SeatGeek", price: 234 },
+      { platform: "Ticketmaster", price: 210 },
+      { platform: "Vivid Seats", price: 225 },
+      { platform: "StubHub", price: 219 },
+    ],
   },
   {
     id: "morgan-wallen-nissan",
@@ -82,6 +126,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "Nissan Stadium",
     city: "Nashville, TN",
     fromPrice: 89,
+    platforms: [
+      { platform: "SeatGeek", price: 96 },
+      { platform: "Ticketmaster", price: 103 },
+      { platform: "Vivid Seats", price: 92 },
+      { platform: "StubHub", price: 89 },
+    ],
   },
   {
     id: "yankees-vs-red-sox-yankee",
@@ -92,6 +142,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "Yankee Stadium",
     city: "Bronx, NY",
     fromPrice: 62,
+    platforms: [
+      { platform: "SeatGeek", price: 62 },
+      { platform: "Ticketmaster", price: 78 },
+      { platform: "Vivid Seats", price: 71 },
+      { platform: "StubHub", price: 69 },
+    ],
   },
   {
     id: "sabrina-carpenter-kia",
@@ -102,6 +158,12 @@ export const mockEvents: SeatEvent[] = [
     venue: "Kia Forum",
     city: "Inglewood, CA",
     fromPrice: 128,
+    platforms: [
+      { platform: "SeatGeek", price: 141 },
+      { platform: "Ticketmaster", price: 152 },
+      { platform: "Vivid Seats", price: 128 },
+      { platform: "StubHub", price: 135 },
+    ],
   },
   {
     id: "heat-vs-bucks-kaseya",
@@ -112,5 +174,15 @@ export const mockEvents: SeatEvent[] = [
     venue: "Kaseya Center",
     city: "Miami, FL",
     fromPrice: 54,
+    platforms: [
+      { platform: "SeatGeek", price: 61 },
+      { platform: "Ticketmaster", price: 54 },
+      { platform: "Vivid Seats", price: 59 },
+      { platform: "StubHub", price: 57 },
+    ],
   },
 ];
+
+export function getEventById(id: string): SeatEvent | undefined {
+  return mockEvents.find((event) => event.id === id);
+}
