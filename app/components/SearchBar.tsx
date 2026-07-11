@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export function SearchBar() {
-  const [query, setQuery] = useState("");
+export function SearchBar({ defaultValue = "" }: { defaultValue?: string }) {
+  const [query, setQuery] = useState(defaultValue);
+  const router = useRouter();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // search logic will go here
+    const trimmed = query.trim();
+    router.push(trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : "/search");
   }
 
   return (
