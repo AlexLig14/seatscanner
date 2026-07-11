@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Navbar } from "../../components/Navbar";
 import { SiteFooter } from "../../components/SiteFooter";
 import { PricePrediction } from "../../components/PricePrediction";
+import { StadiumMap } from "../../components/StadiumMap";
 import { getEventById } from "../../data/mockEvents";
 import type { SeatEvent, PlatformPrice } from "../../data/mockEvents";
 
@@ -119,6 +120,19 @@ export default async function EventDetailPage({
             <span className="font-semibold text-midnight">{event.venue}</span>
             <span className="text-gray-300"> · </span>
             <span>{event.city}</span>
+          </div>
+        </section>
+
+        {/* Stadium map — pick your section (visual only for now) */}
+        <section className="mt-10">
+          <h2 className="mb-4 text-xl font-extrabold tracking-tight text-midnight">
+            Pick your section
+          </h2>
+          <div className="rounded-3xl border border-gray-200 bg-white px-4 py-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)] sm:px-8">
+            <StadiumMap
+              sections={event.sections}
+              centerLabel={event.category === "concert" ? "STAGE" : "FIELD"}
+            />
           </div>
         </section>
 

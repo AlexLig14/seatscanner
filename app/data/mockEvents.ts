@@ -22,6 +22,50 @@ export interface Prediction {
   priceHistory: PricePoint[]; // cheapest price over recent weeks
 }
 
+export type SectionLevel = "Floor" | "Lower" | "Club" | "Upper";
+
+export interface Section {
+  id: string; // e.g. "lower-104"
+  name: string; // e.g. "Lower 104"
+  level: SectionLevel;
+  price: number; // cheapest price in this section, USD
+}
+
+// A schematic 24-section bowl, ordered by level (Floor → Lower → Club → Upper).
+// Order within each level maps to its position around the bowl in the StadiumMap.
+// Sidelines (front/back) cost more than the ends within the same level; Floor is
+// priciest, Upper cheapest. Reused across events for now — vary by venue later.
+export const defaultSections: Section[] = [
+  // Floor (4) — closest to the field, most expensive
+  { id: "floor-1", name: "Floor 1", level: "Floor", price: 330 },
+  { id: "floor-2", name: "Floor 2", level: "Floor", price: 360 },
+  { id: "floor-3", name: "Floor 3", level: "Floor", price: 325 },
+  { id: "floor-4", name: "Floor 4", level: "Floor", price: 355 },
+  // Lower (8)
+  { id: "lower-101", name: "Lower 101", level: "Lower", price: 190 },
+  { id: "lower-102", name: "Lower 102", level: "Lower", price: 225 },
+  { id: "lower-103", name: "Lower 103", level: "Lower", price: 230 },
+  { id: "lower-104", name: "Lower 104", level: "Lower", price: 195 },
+  { id: "lower-105", name: "Lower 105", level: "Lower", price: 192 },
+  { id: "lower-106", name: "Lower 106", level: "Lower", price: 228 },
+  { id: "lower-107", name: "Lower 107", level: "Lower", price: 232 },
+  { id: "lower-108", name: "Lower 108", level: "Lower", price: 188 },
+  // Club (6)
+  { id: "club-201", name: "Club 201", level: "Club", price: 140 },
+  { id: "club-202", name: "Club 202", level: "Club", price: 172 },
+  { id: "club-203", name: "Club 203", level: "Club", price: 138 },
+  { id: "club-204", name: "Club 204", level: "Club", price: 136 },
+  { id: "club-205", name: "Club 205", level: "Club", price: 170 },
+  { id: "club-206", name: "Club 206", level: "Club", price: 142 },
+  // Upper (6) — outermost, cheapest
+  { id: "upper-301", name: "Upper 301", level: "Upper", price: 62 },
+  { id: "upper-302", name: "Upper 302", level: "Upper", price: 92 },
+  { id: "upper-303", name: "Upper 303", level: "Upper", price: 60 },
+  { id: "upper-304", name: "Upper 304", level: "Upper", price: 58 },
+  { id: "upper-305", name: "Upper 305", level: "Upper", price: 90 },
+  { id: "upper-306", name: "Upper 306", level: "Upper", price: 64 },
+];
+
 export interface SeatEvent {
   id: string;
   name: string;
@@ -33,10 +77,12 @@ export interface SeatEvent {
   fromPrice: number; // cheapest available price in USD (matches the lowest platform price)
   platforms: PlatformPrice[]; // per-platform prices — swap for real API data later
   prediction: Prediction; // buy/wait/insufficient call — swap for a real prediction engine later
+  sections: Section[]; // stadium bowl sections — swap for per-venue maps later
 }
 
 // Hardcoded mock data — swap this out for real API results later.
-export const mockEvents: SeatEvent[] = [
+// Sections are attached below via .map() so the shared bowl isn't duplicated per event.
+const eventsWithoutSections: Omit<SeatEvent, "sections">[] = [
   {
     id: "taylor-swift-metlife",
     name: "Taylor Swift — The Eras Tour",
@@ -388,6 +434,12 @@ export const mockEvents: SeatEvent[] = [
     },
   },
 ];
+
+// Attach the shared bowl to every event. Swap defaultSections for per-venue data later.
+export const mockEvents: SeatEvent[] = eventsWithoutSections.map((event) => ({
+  ...event,
+  sections: defaultSections,
+}));
 
 export function getEventById(id: string): SeatEvent | undefined {
   return mockEvents.find((event) => event.id === id);
