@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Navbar } from "../../components/Navbar";
 import { SiteFooter } from "../../components/SiteFooter";
+import { PricePrediction } from "../../components/PricePrediction";
 import { getEventById } from "../../data/mockEvents";
 import type { SeatEvent, PlatformPrice } from "../../data/mockEvents";
 
@@ -66,35 +67,6 @@ function PlatformRow({
         >
           Go to {entry.platform}
         </a>
-      </div>
-    </div>
-  );
-}
-
-function PredictionPlaceholder() {
-  return (
-    <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50/70 px-6 py-8">
-      <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-scanner-amber shadow-sm">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M3 17l5-5 4 4 8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M15 8h5v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-midnight">
-              Buy now vs. wait — price prediction
-            </h3>
-            <span className="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-              Coming soon
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-gray-500">
-            We&rsquo;ll forecast whether this event&rsquo;s prices are likely to rise or
-            drop, so you know the best moment to buy.
-          </p>
-        </div>
       </div>
     </div>
   );
@@ -171,10 +143,8 @@ export default async function EventDetailPage({
           </div>
         </section>
 
-        {/* Future feature placeholder */}
-        <section className="mt-10">
-          <PredictionPlaceholder />
-        </section>
+        {/* Buy now vs. wait — price prediction */}
+        <PricePrediction prediction={event.prediction} />
       </main>
 
       <SiteFooter />
