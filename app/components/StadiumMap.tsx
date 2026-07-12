@@ -94,11 +94,18 @@ export function StadiumMap({
 
   const laidOut = useMemo<LaidOutSection[]>(() => {
     const prices = sections.map((s) => s.price);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const norm = (p: number) => (max === min ? 0 : (p - min) / (max - min));
+    // Rank-based color: spread the gradient evenly across all sections so the
+    // priciest bowl sections read as warm/amber, not squished into green by the
+    // much-more-expensive floor. Ties (equal prices) share the same color.
+    const sorted = [...prices].sort((a, b) => a - b);
+    const n = prices.length;
+    const rankT = (p: number) => {
+      if (n <= 1) return 0;
+      const avgIndex = (sorted.indexOf(p) + sorted.lastIndexOf(p)) / 2;
+      return avgIndex / (n - 1);
+    };
     const withColor = (section: Section, shape: LaidOutSection["shape"], centroid: { x: number; y: number }) => {
-      const t = norm(section.price);
+      const t = rankT(section.price);
       return { section, shape, centroid, color: heatColor(t), activeColor: heatColor(t, 9) };
     };
 
@@ -208,30 +215,36 @@ export function StadiumMap({
           })}
         </g>
 
-        {/* Quiet zone labels */}
+        {/* Zone labels on soft white pills for clear legibility */}
         <g pointerEvents="none">
-          {ZONE_LABELS.map((z) => (
-            <text
-              key={z.text}
-              x={z.x}
-              y={z.y}
-              textAnchor="middle"
-              dominantBaseline="central"
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 2,
-                fill: "#0F172A",
-                fillOpacity: 0.62,
-                stroke: "#FFFFFF",
-                strokeWidth: 3,
-                strokeOpacity: 0.65,
-                paintOrder: "stroke",
-              }}
-            >
-              {z.text}
-            </text>
-          ))}
+          {ZONE_LABELS.map((z) => {
+            const w = z.text.length * 8.4 + 20;
+            const h = 21;
+            return (
+              <g key={z.text}>
+                <rect
+                  x={z.x - w / 2}
+                  y={z.y - h / 2}
+                  width={w}
+                  height={h}
+                  rx={h / 2}
+                  fill="#FFFFFF"
+                  fillOpacity={0.9}
+                  stroke="#E5E9EE"
+                  strokeOpacity={0.9}
+                />
+                <text
+                  x={z.x}
+                  y={z.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: 1.2, fill: "#0F172A" }}
+                >
+                  {z.text}
+                </text>
+              </g>
+            );
+          })}
         </g>
 
         {/* Price tooltip for the hovered/selected section */}

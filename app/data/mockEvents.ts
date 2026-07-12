@@ -59,23 +59,24 @@ function buildSectionsForEvent(fromPrice: number): Section[] {
   };
 
   // Floor: 3 wide bands stacked front → back, front closest to the stage & priciest.
-  add("floor-front", "Floor Front", "Floor", 4.4);
-  add("floor-middle", "Floor Middle", "Floor", 3.9);
-  add("floor-back", "Floor Back", "Floor", 3.5);
+  add("floor-front", "Floor Front", "Floor", 4.6);
+  add("floor-middle", "Floor Middle", "Floor", 4.1);
+  add("floor-back", "Floor Back", "Floor", 3.6);
 
   // Each tier has 4 sections across the horseshoe (left → right). The center
-  // sections face the stage more directly, so they carry a higher price factor
-  // (pf) than the outer Left/Right sections in the same tier.
+  // sections face the stage directly and carry a pronounced premium (pf = 1) over
+  // the outer Left/Right sections (pf = 0) — a real center-vs-side price gap.
   const positions: { suffix: string; slug: string; pf: number }[] = [
     { suffix: "Left", slug: "left", pf: 0 },
-    { suffix: "Left Center", slug: "left-center", pf: 0.86 },
-    { suffix: "Right Center", slug: "right-center", pf: 0.86 },
+    { suffix: "Left Center", slug: "left-center", pf: 1 },
+    { suffix: "Right Center", slug: "right-center", pf: 1 },
     { suffix: "Right", slug: "right", pf: 0 },
   ];
+  // base = outer (side) multiplier; base + spread = center multiplier.
   const tiers: { level: SectionLevel; base: number; spread: number }[] = [
-    { level: "Lower", base: 2.3, spread: 0.9 },
-    { level: "Club", base: 1.6, spread: 0.6 },
-    { level: "Upper", base: 1.0, spread: 0.4 },
+    { level: "Lower", base: 2.4, spread: 1.0 }, // side 2.4x → center 3.4x
+    { level: "Club", base: 1.6, spread: 0.75 }, // side 1.6x → center 2.35x
+    { level: "Upper", base: 1.0, spread: 0.55 }, // side 1.0x → center 1.55x
   ];
   tiers.forEach(({ level, base, spread }) => {
     positions.forEach(({ suffix, slug, pf }) => {
