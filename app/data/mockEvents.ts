@@ -31,40 +31,53 @@ export interface Section {
   price: number; // cheapest price in this section, USD
 }
 
-// A schematic 24-section bowl, ordered by level (Floor → Lower → Club → Upper).
-// Order within each level maps to its position around the bowl in the StadiumMap.
-// Sidelines (front/back) cost more than the ends within the same level; Floor is
-// priciest, Upper cheapest. Reused across events for now — vary by venue later.
-export const defaultSections: Section[] = [
-  // Floor (4) — closest to the field, most expensive
-  { id: "floor-1", name: "Floor 1", level: "Floor", price: 330 },
-  { id: "floor-2", name: "Floor 2", level: "Floor", price: 360 },
-  { id: "floor-3", name: "Floor 3", level: "Floor", price: 325 },
-  { id: "floor-4", name: "Floor 4", level: "Floor", price: 355 },
-  // Lower (8)
-  { id: "lower-101", name: "Lower 101", level: "Lower", price: 190 },
-  { id: "lower-102", name: "Lower 102", level: "Lower", price: 225 },
-  { id: "lower-103", name: "Lower 103", level: "Lower", price: 230 },
-  { id: "lower-104", name: "Lower 104", level: "Lower", price: 195 },
-  { id: "lower-105", name: "Lower 105", level: "Lower", price: 192 },
-  { id: "lower-106", name: "Lower 106", level: "Lower", price: 228 },
-  { id: "lower-107", name: "Lower 107", level: "Lower", price: 232 },
-  { id: "lower-108", name: "Lower 108", level: "Lower", price: 188 },
-  // Club (6)
-  { id: "club-201", name: "Club 201", level: "Club", price: 140 },
-  { id: "club-202", name: "Club 202", level: "Club", price: 172 },
-  { id: "club-203", name: "Club 203", level: "Club", price: 138 },
-  { id: "club-204", name: "Club 204", level: "Club", price: 136 },
-  { id: "club-205", name: "Club 205", level: "Club", price: 170 },
-  { id: "club-206", name: "Club 206", level: "Club", price: 142 },
-  // Upper (6) — outermost, cheapest
-  { id: "upper-301", name: "Upper 301", level: "Upper", price: 62 },
-  { id: "upper-302", name: "Upper 302", level: "Upper", price: 92 },
-  { id: "upper-303", name: "Upper 303", level: "Upper", price: 60 },
-  { id: "upper-304", name: "Upper 304", level: "Upper", price: 58 },
-  { id: "upper-305", name: "Upper 305", level: "Upper", price: 90 },
-  { id: "upper-306", name: "Upper 306", level: "Upper", price: 64 },
-];
+// A schematic top-down concert bowl: a Floor grid nearest the stage, then Lower →
+// Club → Upper tiers fanning out in a horseshoe. Order within each level maps to
+// position in the StadiumMap (Floor row-major; tiers slot 0→N around the arc).
+// Prices skew pricier by tier (Floor > Upper) and by position (center/front > ends).
+// Reused across events for now — vary by venue later.
+function buildDefaultSections(): Section[] {
+  const sections: Section[] = [];
+
+  // Floor grid (6), row-major with the front row (nearest stage) priciest.
+  const floorPrices = [360, 355, 335, 330, 312, 305];
+  floorPrices.forEach((price, i) => {
+    sections.push({
+      id: `floor-${i + 1}`,
+      name: `Floor ${i + 1}`,
+      level: "Floor",
+      price,
+    });
+  });
+
+  // Arc tiers (12 each). Price peaks at the center-facing sections (angle ~90°,
+  // straight-on to the stage) and eases toward the side/corner sections.
+  const A0 = -32;
+  const A1 = 212;
+  const tiers: { level: SectionLevel; startNum: number; base: number; spread: number }[] = [
+    { level: "Lower", startNum: 101, base: 175, spread: 65 },
+    { level: "Club", startNum: 201, base: 130, spread: 45 },
+    { level: "Upper", startNum: 301, base: 55, spread: 40 },
+  ];
+  const count = 12;
+  tiers.forEach(({ level, startNum, base, spread }) => {
+    for (let i = 0; i < count; i++) {
+      const midDeg = A0 + ((i + 0.5) * (A1 - A0)) / count;
+      const facing = Math.max(0, Math.cos(((midDeg - 90) * Math.PI) / 180));
+      const num = startNum + i;
+      sections.push({
+        id: `${level.toLowerCase()}-${num}`,
+        name: `${level} ${num}`,
+        level,
+        price: Math.round(base + spread * facing),
+      });
+    }
+  });
+
+  return sections;
+}
+
+export const defaultSections: Section[] = buildDefaultSections();
 
 export interface SeatEvent {
   id: string;
