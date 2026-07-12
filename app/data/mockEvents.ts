@@ -28,56 +28,61 @@ export interface Section {
   id: string; // e.g. "lower-104"
   name: string; // e.g. "Lower 104"
   level: SectionLevel;
-  price: number; // cheapest price in this section, USD
+  price: number; // cheapest price in this section, USD (== the lowest platform price below)
+  platforms: PlatformPrice[]; // per-platform prices for this section
 }
 
-// A schematic top-down concert bowl: a Floor grid nearest the stage, then Lower →
-// Club → Upper tiers fanning out in a horseshoe. Order within each level maps to
-// position in the StadiumMap (Floor row-major; tiers slot 0→N around the arc).
-// Prices skew pricier by tier (Floor > Upper) and by position (center/front > ends).
-// Reused across events for now — vary by venue later.
-function buildDefaultSections(): Section[] {
+const PLATFORM_NAMES: PlatformName[] = ["SeatGeek", "StubHub", "Vivid Seats", "Ticketmaster"];
+
+// Per-platform prices for a section. The cheapest platform equals `base` (so
+// section.price == min(platforms)); the others carry realistic markups. The seed
+// rotates which platform is cheapest so it varies section to section.
+function sectionPlatforms(base: number, seed: number): PlatformPrice[] {
+  const deltas = [0, Math.round(base * 0.05) + 3, Math.round(base * 0.1) + 2, Math.round(base * 0.15) + 5];
+  return PLATFORM_NAMES.map((platform, i) => ({
+    platform,
+    price: base + deltas[(i + seed) % deltas.length],
+  }));
+}
+
+// A schematic top-down concert bowl: three GA Floor bands nearest the stage
+// (front → back), then Lower → Club → Upper tiers fanning out in a horseshoe.
+// Order within each level maps to position in the StadiumMap. Prices are relative
+// multipliers scaled to the event's fromPrice, so the cheapest section == fromPrice
+// and Floor Front is the priciest — keeping the map, panel, and search cards in sync.
+function buildSectionsForEvent(fromPrice: number): Section[] {
   const sections: Section[] = [];
+  let seed = 0;
+  const add = (id: string, name: string, level: SectionLevel, rel: number) => {
+    const price = Math.round(fromPrice * rel);
+    sections.push({ id, name, level, price, platforms: sectionPlatforms(price, seed++) });
+  };
 
-  // Floor grid (6), row-major with the front row (nearest stage) priciest.
-  const floorPrices = [360, 355, 335, 330, 312, 305];
-  floorPrices.forEach((price, i) => {
-    sections.push({
-      id: `floor-${i + 1}`,
-      name: `Floor ${i + 1}`,
-      level: "Floor",
-      price,
-    });
-  });
+  // Floor: 3 wide bands stacked front → back, front closest to the stage & priciest.
+  add("floor-front", "Floor Front", "Floor", 4.4);
+  add("floor-middle", "Floor Middle", "Floor", 3.9);
+  add("floor-back", "Floor Back", "Floor", 3.5);
 
-  // Arc tiers (12 each). Price peaks at the center-facing sections (angle ~90°,
-  // straight-on to the stage) and eases toward the side/corner sections.
+  // Arc tiers (12 each). Relative price peaks at the center-facing sections
+  // (angle ~90°, straight-on to the stage) and eases toward the side/corner ends.
   const A0 = -32;
   const A1 = 212;
-  const tiers: { level: SectionLevel; startNum: number; base: number; spread: number }[] = [
-    { level: "Lower", startNum: 101, base: 175, spread: 65 },
-    { level: "Club", startNum: 201, base: 130, spread: 45 },
-    { level: "Upper", startNum: 301, base: 55, spread: 40 },
-  ];
   const count = 12;
+  const tiers: { level: SectionLevel; startNum: number; base: number; spread: number }[] = [
+    { level: "Lower", startNum: 101, base: 2.3, spread: 0.8 },
+    { level: "Club", startNum: 201, base: 1.6, spread: 0.5 },
+    { level: "Upper", startNum: 301, base: 1.0, spread: 0.35 },
+  ];
   tiers.forEach(({ level, startNum, base, spread }) => {
     for (let i = 0; i < count; i++) {
       const midDeg = A0 + ((i + 0.5) * (A1 - A0)) / count;
       const facing = Math.max(0, Math.cos(((midDeg - 90) * Math.PI) / 180));
-      const num = startNum + i;
-      sections.push({
-        id: `${level.toLowerCase()}-${num}`,
-        name: `${level} ${num}`,
-        level,
-        price: Math.round(base + spread * facing),
-      });
+      add(`${level.toLowerCase()}-${startNum + i}`, `${level} ${startNum + i}`, level, base + spread * facing);
     }
   });
 
   return sections;
 }
-
-export const defaultSections: Section[] = buildDefaultSections();
 
 export interface SeatEvent {
   id: string;
@@ -448,10 +453,10 @@ const eventsWithoutSections: Omit<SeatEvent, "sections">[] = [
   },
 ];
 
-// Attach the shared bowl to every event. Swap defaultSections for per-venue data later.
+// Attach a bowl scaled to each event's fromPrice. Swap for per-venue data later.
 export const mockEvents: SeatEvent[] = eventsWithoutSections.map((event) => ({
   ...event,
-  sections: defaultSections,
+  sections: buildSectionsForEvent(event.fromPrice),
 }));
 
 export function getEventById(id: string): SeatEvent | undefined {

@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { Navbar } from "../../components/Navbar";
 import { SiteFooter } from "../../components/SiteFooter";
 import { PricePrediction } from "../../components/PricePrediction";
-import { StadiumMap } from "../../components/StadiumMap";
+import { SeatingSection } from "../../components/SeatingSection";
 import { getEventById } from "../../data/mockEvents";
-import type { SeatEvent, PlatformPrice } from "../../data/mockEvents";
+import type { SeatEvent } from "../../data/mockEvents";
 
 function formatDate(iso: string): string {
   const d = new Date(iso + "T00:00:00");
@@ -26,53 +26,6 @@ function CategoryBadge({ category }: { category: SeatEvent["category"] }) {
   );
 }
 
-function PlatformRow({
-  entry,
-  isBest,
-}: {
-  entry: PlatformPrice;
-  isBest: boolean;
-}) {
-  return (
-    <div
-      className={`flex items-center justify-between gap-6 rounded-2xl border px-6 py-5 transition-all ${
-        isBest
-          ? "border-seat-green bg-seat-green/5 shadow-[0_4px_20px_rgba(0,170,108,0.12)]"
-          : "border-gray-200 bg-white"
-      }`}
-    >
-      {/* Left: platform name + best-price badge */}
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="text-lg font-bold tracking-tight text-midnight">
-          {entry.platform}
-        </span>
-        {isBest && (
-          <span className="inline-flex items-center rounded-full bg-seat-green px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
-            Best Price
-          </span>
-        )}
-      </div>
-
-      {/* Right: price + action */}
-      <div className="flex shrink-0 items-center gap-6">
-        <div
-          className={`text-2xl font-extrabold ${
-            isBest ? "text-seat-green" : "text-midnight"
-          }`}
-        >
-          ${entry.price}
-        </div>
-        <a
-          href="#"
-          className="inline-flex items-center rounded-xl bg-scanner-amber px-5 py-2.5 text-sm font-semibold text-midnight transition-all hover:brightness-105"
-        >
-          Go to {entry.platform}
-        </a>
-      </div>
-    </div>
-  );
-}
-
 export default async function EventDetailPage({
   params,
 }: {
@@ -85,15 +38,11 @@ export default async function EventDetailPage({
     notFound();
   }
 
-  // Sort platforms cheapest → most expensive; the first is the best price.
-  const sorted = [...event.platforms].sort((a, b) => a.price - b.price);
-  const bestPrice = sorted[0]?.price;
-
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
         {/* Back link */}
         <Link
           href="/search"
@@ -123,41 +72,13 @@ export default async function EventDetailPage({
           </div>
         </section>
 
-        {/* Stadium map — pick your section (visual only for now) */}
-        <section className="mt-10">
-          <h2 className="mb-4 text-xl font-extrabold tracking-tight text-midnight">
-            Pick your section
-          </h2>
-          <div className="rounded-3xl border border-gray-200 bg-white px-4 py-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)] sm:px-8">
-            <StadiumMap
-              sections={event.sections}
-              centerLabel={event.category === "concert" ? "STAGE" : "FIELD"}
-            />
-          </div>
-        </section>
+        {/* Stadium map (left) + section-aware price comparison (right) */}
+        <SeatingSection
+          event={event}
+          centerLabel={event.category === "concert" ? "STAGE" : "FIELD"}
+        />
 
-        {/* Platform price comparison */}
-        <section className="mt-10">
-          <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-xl font-extrabold tracking-tight text-midnight">
-              Compare prices
-            </h2>
-            <span className="text-sm text-gray-400">
-              {sorted.length} platforms
-            </span>
-          </div>
-          <div className="flex flex-col gap-3">
-            {sorted.map((entry) => (
-              <PlatformRow
-                key={entry.platform}
-                entry={entry}
-                isBest={entry.price === bestPrice}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Buy now vs. wait — price prediction */}
+        {/* Buy now vs. wait — price prediction (full width, below) */}
         <PricePrediction prediction={event.prediction} />
       </main>
 

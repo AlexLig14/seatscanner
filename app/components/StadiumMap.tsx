@@ -10,15 +10,15 @@ const VIEW_H = 720;
 // --- Stage (wide rectangle at the top) ---
 const STAGE = { x: 175, y: 46, w: 450, h: 54 };
 
-// --- Floor grid (nearest the stage) ---
-const FLOOR = { x: 312, y: 138, w: 176, h: 156, cols: 2, rows: 3, gap: 6 };
+// --- Floor: three wide bands stacked front → back, in front of the stage ---
+const FLOOR = { x: 305, y: 128, w: 190, h: 170, gap: 6 };
 
 // --- Bowl arc tiers (horseshoe fanning out below/around the floor) ---
 const ARC_CX = 400;
 const ARC_CY = 320;
 const ARC_A0 = -32; // leading edge (upper-right), degrees
 const ARC_A1 = 212; // trailing edge (upper-left) — opening (~116°) centered at the top
-const ARC_GAP_DEG = 1.6;
+const ARC_GAP_DEG = 1.8;
 
 interface TierRing {
   inner: number;
@@ -29,6 +29,14 @@ const TIER_RINGS: Record<Exclude<SectionLevel, "Floor">, TierRing> = {
   Club: { inner: 251, outer: 309 },
   Upper: { inner: 322, outer: 380 },
 };
+
+// Quiet zone labels placed over the map for legibility.
+const ZONE_LABELS = [
+  { text: "GA FLOOR", x: 400, y: 213 },
+  { text: "LOWER", x: 400, y: 529 },
+  { text: "CLUB", x: 400, y: 600 },
+  { text: "UPPER", x: 400, y: 671 },
+];
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -73,13 +81,16 @@ interface LaidOutSection {
 export function StadiumMap({
   sections,
   centerLabel = "STAGE",
+  selectedId = null,
+  onSelect,
 }: {
   sections: Section[];
   centerLabel?: string;
+  selectedId?: string | null;
+  onSelect?: (id: string | null) => void;
 }) {
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const [pinnedId, setPinnedId] = useState<string | null>(null);
-  const activeId = hoverId ?? pinnedId;
+  const tooltipId = hoverId ?? selectedId;
 
   const laidOut = useMemo<LaidOutSection[]>(() => {
     const prices = sections.map((s) => s.price);
@@ -93,17 +104,13 @@ export function StadiumMap({
 
     const out: LaidOutSection[] = [];
 
-    // Floor grid (row-major)
+    // Floor bands (stacked front → back)
     const floor = sections.filter((s) => s.level === "Floor");
-    const cellW = (FLOOR.w - FLOOR.gap * (FLOOR.cols - 1)) / FLOOR.cols;
-    const cellH = (FLOOR.h - FLOOR.gap * (FLOOR.rows - 1)) / FLOOR.rows;
+    const bandH = (FLOOR.h - FLOOR.gap * (floor.length - 1)) / floor.length;
     floor.forEach((section, i) => {
-      const r = Math.floor(i / FLOOR.cols);
-      const c = i % FLOOR.cols;
-      const x = FLOOR.x + c * (cellW + FLOOR.gap);
-      const y = FLOOR.y + r * (cellH + FLOOR.gap);
+      const y = FLOOR.y + i * (bandH + FLOOR.gap);
       out.push(
-        withColor(section, { kind: "rect", x, y, w: cellW, h: cellH }, { x: x + cellW / 2, y: y + cellH / 2 })
+        withColor(section, { kind: "rect", x: FLOOR.x, y, w: FLOOR.w, h: bandH }, { x: FLOOR.x + FLOOR.w / 2, y: y + bandH / 2 })
       );
     });
 
@@ -130,7 +137,9 @@ export function StadiumMap({
     return out;
   }, [sections]);
 
-  const active = laidOut.find((s) => s.section.id === activeId) ?? null;
+  const active = laidOut.find((s) => s.section.id === tooltipId) ?? null;
+
+  const handleClick = (id: string) => onSelect?.(selectedId === id ? null : id);
 
   return (
     <div className="w-full">
@@ -145,10 +154,13 @@ export function StadiumMap({
           <filter id="tooltipShadow" x="-30%" y="-30%" width="160%" height="160%">
             <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#0F172A" floodOpacity="0.16" />
           </filter>
+          <filter id="bowlShadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0F172A" floodOpacity="0.12" />
+          </filter>
         </defs>
 
-        {/* Backdrop — tapping empty space dismisses a pinned section */}
-        <rect x="0" y="0" width={VIEW_W} height={VIEW_H} fill="transparent" onClick={() => setPinnedId(null)} />
+        {/* Backdrop — tapping empty space clears the selection */}
+        <rect x="0" y="0" width={VIEW_W} height={VIEW_H} fill="transparent" onClick={() => onSelect?.(null)} />
 
         {/* Stage */}
         <rect x={STAGE.x} y={STAGE.y} width={STAGE.w} height={STAGE.h} rx={8} fill="#0F172A" />
@@ -163,35 +175,65 @@ export function StadiumMap({
           {centerLabel}
         </text>
 
-        {/* Sections */}
-        {laidOut.map(({ section, shape, color, activeColor }) => {
-          const isActive = section.id === activeId;
-          const common = {
-            fill: isActive ? activeColor : color,
-            stroke: isActive ? "#0F172A" : "#FFFFFF",
-            strokeWidth: isActive ? 2.5 : 2,
-            strokeLinejoin: "round" as const,
-            className: "cursor-pointer transition-[stroke,fill] duration-150",
-            onMouseEnter: () => setHoverId(section.id),
-            onMouseLeave: () => setHoverId(null),
-            onClick: (e: React.MouseEvent) => {
-              e.stopPropagation();
-              setPinnedId((prev) => (prev === section.id ? null : section.id));
-            },
-          };
-          const title = <title>{`${section.name} — from $${section.price}`}</title>;
-          return shape.kind === "rect" ? (
-            <rect key={section.id} x={shape.x} y={shape.y} width={shape.w} height={shape.h} rx={4} {...common}>
-              {title}
-            </rect>
-          ) : (
-            <path key={section.id} d={shape.d} {...common}>
-              {title}
-            </path>
-          );
-        })}
+        {/* Sections (with a soft group shadow for subtle depth) */}
+        <g filter="url(#bowlShadow)">
+          {laidOut.map(({ section, shape, color, activeColor }) => {
+            const isSelected = section.id === selectedId;
+            const isHover = section.id === hoverId;
+            const isActive = isSelected || isHover;
+            const common = {
+              fill: isActive ? activeColor : color,
+              stroke: isActive ? "#0F172A" : "#FFFFFF",
+              strokeWidth: isSelected ? 3 : isHover ? 2.25 : 2,
+              strokeLinejoin: "round" as const,
+              className: "cursor-pointer transition-[stroke,fill] duration-150",
+              onMouseEnter: () => setHoverId(section.id),
+              onMouseLeave: () => setHoverId(null),
+              onClick: (e: React.MouseEvent) => {
+                e.stopPropagation();
+                handleClick(section.id);
+              },
+            };
+            const title = <title>{`${section.name} — from $${section.price}`}</title>;
+            return shape.kind === "rect" ? (
+              <rect key={section.id} x={shape.x} y={shape.y} width={shape.w} height={shape.h} rx={6} {...common}>
+                {title}
+              </rect>
+            ) : (
+              <path key={section.id} d={shape.d} {...common}>
+                {title}
+              </path>
+            );
+          })}
+        </g>
 
-        {/* Price tooltip for the active section */}
+        {/* Quiet zone labels */}
+        <g pointerEvents="none">
+          {ZONE_LABELS.map((z) => (
+            <text
+              key={z.text}
+              x={z.x}
+              y={z.y}
+              textAnchor="middle"
+              dominantBaseline="central"
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: 2,
+                fill: "#0F172A",
+                fillOpacity: 0.62,
+                stroke: "#FFFFFF",
+                strokeWidth: 3,
+                strokeOpacity: 0.65,
+                paintOrder: "stroke",
+              }}
+            >
+              {z.text}
+            </text>
+          ))}
+        </g>
+
+        {/* Price tooltip for the hovered/selected section */}
         {active && (
           <g pointerEvents="none">
             {(() => {
@@ -201,32 +243,11 @@ export function StadiumMap({
               const y = clamp(active.centroid.y, h / 2 + 6, VIEW_H - h / 2 - 6);
               return (
                 <>
-                  <rect
-                    x={x - w / 2}
-                    y={y - h / 2}
-                    width={w}
-                    height={h}
-                    rx={10}
-                    fill="#FFFFFF"
-                    stroke="#E5E9EE"
-                    filter="url(#tooltipShadow)"
-                  />
-                  <text
-                    x={x}
-                    y={y - 7}
-                    textAnchor="middle"
-                    className="fill-gray-500"
-                    style={{ fontSize: 12, fontWeight: 600 }}
-                  >
+                  <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={10} fill="#FFFFFF" stroke="#E5E9EE" filter="url(#tooltipShadow)" />
+                  <text x={x} y={y - 7} textAnchor="middle" className="fill-gray-500" style={{ fontSize: 12, fontWeight: 600 }}>
                     {active.section.name}
                   </text>
-                  <text
-                    x={x}
-                    y={y + 13}
-                    textAnchor="middle"
-                    className="fill-midnight"
-                    style={{ fontSize: 16, fontWeight: 800 }}
-                  >
+                  <text x={x} y={y + 13} textAnchor="middle" className="fill-midnight" style={{ fontSize: 16, fontWeight: 800 }}>
                     from ${active.section.price}
                   </text>
                 </>
@@ -241,15 +262,15 @@ export function StadiumMap({
         <span className="text-xs font-semibold text-gray-500">$ Cheaper</span>
         <div
           className="h-2.5 w-36 rounded-full sm:w-44"
-          style={{
-            background:
-              "linear-gradient(90deg, hsl(158 100% 33%), hsl(98 96% 44%), hsl(39 91% 55%))",
-          }}
+          style={{ background: "linear-gradient(90deg, hsl(158 100% 33%), hsl(98 96% 44%), hsl(39 91% 55%))" }}
         />
         <span className="text-xs font-semibold text-gray-500">Pricier $$$</span>
       </div>
       <p className="mt-2 text-center text-xs text-gray-400">
         Hover or tap a section to see its starting price
+      </p>
+      <p className="mt-1 text-center text-[11px] text-gray-400">
+        Generalized seating layout — actual section names and positions may vary by venue.
       </p>
     </div>
   );
