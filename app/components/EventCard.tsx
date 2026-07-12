@@ -24,14 +24,14 @@ export function EventCard({ event }: { event: SeatEvent }) {
   return (
     <Link
       href={`/event/${event.id}`}
-      className="group flex items-center justify-between gap-6 rounded-2xl border border-gray-200 bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.10)]"
+      className="group flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white px-6 py-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-[0_8px_28px_rgba(0,0,0,0.10)] sm:flex-row sm:items-center sm:justify-between sm:gap-6"
     >
       {/* Left: event details */}
-      <div className="min-w-0 flex flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-2">
         <div className="flex items-center gap-3">
           <CategoryBadge category={event.category} />
         </div>
-        <h3 className="truncate text-xl font-extrabold tracking-tight text-midnight">
+        <h3 className="text-xl font-extrabold tracking-tight text-midnight sm:truncate">
           {event.name}
         </h3>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
@@ -46,9 +46,9 @@ export function EventCard({ event }: { event: SeatEvent }) {
         </div>
       </div>
 
-      {/* Right: price + action */}
-      <div className="flex shrink-0 flex-col items-end gap-3">
-        <div className="text-right leading-none">
+      {/* Right: price + action — full-width row on mobile, stacked column on desktop */}
+      <div className="flex items-center justify-between gap-4 sm:shrink-0 sm:flex-col sm:items-end sm:gap-3">
+        <div className="text-left leading-none sm:text-right">
           <div className="text-xs font-medium uppercase tracking-wide text-gray-400">
             from
           </div>

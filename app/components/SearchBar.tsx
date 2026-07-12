@@ -32,12 +32,12 @@ export function SearchBar({ defaultValue = "" }: { defaultValue?: string }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for an artist, team, or event..."
-          className="flex-1 px-4 py-5 text-base text-midnight placeholder-gray-400 bg-transparent outline-none font-sans"
+          className="min-w-0 flex-1 px-3 py-5 text-base text-midnight placeholder-gray-400 bg-transparent outline-none font-sans sm:px-4"
           aria-label="Search for an artist, team, or event"
         />
         <button
           type="submit"
-          className="m-2 px-6 py-3 bg-seat-green text-white font-semibold rounded-xl hover:brightness-105 active:brightness-95 transition-all cursor-pointer"
+          className="m-2 shrink-0 px-4 py-3 bg-seat-green text-white font-semibold rounded-xl hover:brightness-105 active:brightness-95 transition-all cursor-pointer sm:px-6"
         >
           Search
         </button>
