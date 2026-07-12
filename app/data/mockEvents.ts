@@ -63,22 +63,24 @@ function buildSectionsForEvent(fromPrice: number): Section[] {
   add("floor-middle", "Floor Middle", "Floor", 3.9);
   add("floor-back", "Floor Back", "Floor", 3.5);
 
-  // Arc tiers (12 each). Relative price peaks at the center-facing sections
-  // (angle ~90°, straight-on to the stage) and eases toward the side/corner ends.
-  const A0 = -32;
-  const A1 = 212;
-  const count = 12;
-  const tiers: { level: SectionLevel; startNum: number; base: number; spread: number }[] = [
-    { level: "Lower", startNum: 101, base: 2.3, spread: 0.8 },
-    { level: "Club", startNum: 201, base: 1.6, spread: 0.5 },
-    { level: "Upper", startNum: 301, base: 1.0, spread: 0.35 },
+  // Each tier has 4 sections across the horseshoe (left → right). The center
+  // sections face the stage more directly, so they carry a higher price factor
+  // (pf) than the outer Left/Right sections in the same tier.
+  const positions: { suffix: string; slug: string; pf: number }[] = [
+    { suffix: "Left", slug: "left", pf: 0 },
+    { suffix: "Left Center", slug: "left-center", pf: 0.86 },
+    { suffix: "Right Center", slug: "right-center", pf: 0.86 },
+    { suffix: "Right", slug: "right", pf: 0 },
   ];
-  tiers.forEach(({ level, startNum, base, spread }) => {
-    for (let i = 0; i < count; i++) {
-      const midDeg = A0 + ((i + 0.5) * (A1 - A0)) / count;
-      const facing = Math.max(0, Math.cos(((midDeg - 90) * Math.PI) / 180));
-      add(`${level.toLowerCase()}-${startNum + i}`, `${level} ${startNum + i}`, level, base + spread * facing);
-    }
+  const tiers: { level: SectionLevel; base: number; spread: number }[] = [
+    { level: "Lower", base: 2.3, spread: 0.9 },
+    { level: "Club", base: 1.6, spread: 0.6 },
+    { level: "Upper", base: 1.0, spread: 0.4 },
+  ];
+  tiers.forEach(({ level, base, spread }) => {
+    positions.forEach(({ suffix, slug, pf }) => {
+      add(`${level.toLowerCase()}-${slug}`, `${level} ${suffix}`, level, base + spread * pf);
+    });
   });
 
   return sections;

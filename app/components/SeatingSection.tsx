@@ -18,7 +18,7 @@ export function SeatingSection({
     : null;
 
   return (
-    <section className="mt-10 grid gap-8 lg:grid-cols-2 lg:items-start">
+    <section className="mt-10 grid gap-8 lg:grid-cols-2 lg:items-start lg:gap-12">
       {/* Left: stadium map */}
       <div>
         <h2 className="mb-4 text-xl font-extrabold tracking-tight text-midnight">

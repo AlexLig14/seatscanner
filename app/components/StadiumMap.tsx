@@ -119,9 +119,10 @@ export function StadiumMap({
       const ring = TIER_RINGS[level];
       const group = sections.filter((s) => s.level === level);
       const step = (ARC_A1 - ARC_A0) / group.length;
+      // Index 0 = Left (west end), increasing toward Right (east end).
       group.forEach((section, i) => {
-        const a0 = ARC_A0 + i * step + ARC_GAP_DEG / 2;
-        const a1 = ARC_A0 + (i + 1) * step - ARC_GAP_DEG / 2;
+        const a0 = ARC_A1 - (i + 1) * step + ARC_GAP_DEG / 2;
+        const a1 = ARC_A1 - i * step - ARC_GAP_DEG / 2;
         const mid = rad((a0 + a1) / 2);
         const midR = (ring.inner + ring.outer) / 2;
         out.push(
