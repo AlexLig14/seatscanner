@@ -28,7 +28,9 @@ function PlatformRow({ entry, isBest }: { entry: PlatformPrice; isBest: boolean 
       </div>
       <a
         href="#"
-        className="shrink-0 rounded-xl bg-scanner-amber px-4 py-2.5 text-sm font-semibold text-midnight transition-all hover:brightness-105"
+        className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:brightness-105 ${
+          isBest ? "bg-seat-green text-white" : "bg-scanner-amber text-midnight"
+        }`}
       >
         Go to {entry.platform}
       </a>
