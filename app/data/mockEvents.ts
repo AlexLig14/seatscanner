@@ -1,5 +1,9 @@
 export type EventCategory = "concert" | "sports";
 
+// Which stadium-map layout an event loads. "stadium" and "baseball" fall back to
+// the concert map until their own maps are built.
+export type VenueType = "concert" | "arena" | "stadium" | "baseball";
+
 export type PlatformName = "SeatGeek" | "Ticketmaster" | "Vivid Seats" | "StubHub";
 
 export interface PlatformPrice {
@@ -50,7 +54,7 @@ function sectionPlatforms(base: number, seed: number): PlatformPrice[] {
 // Order within each level maps to position in the StadiumMap. Prices are relative
 // multipliers scaled to the event's fromPrice, so the cheapest section == fromPrice
 // and Floor Front is the priciest — keeping the map, panel, and search cards in sync.
-function buildSectionsForEvent(fromPrice: number): Section[] {
+function buildConcertSections(fromPrice: number): Section[] {
   const sections: Section[] = [];
   let seed = 0;
   const add = (id: string, name: string, level: SectionLevel, rel: number) => {
@@ -87,10 +91,50 @@ function buildSectionsForEvent(fromPrice: number): Section[] {
   return sections;
 }
 
+// A basketball/hockey ARENA bowl: a full wrap of 8 sections per tier around the
+// court/rink. Sidelines (long sides) are premium, baselines (short ends) mid,
+// corners cheapest. The ArenaMap positions each section by its id slug, so this
+// order is not load-bearing. pf: corner 0 → baseline 0.4 → sideline 1.
+const ARENA_POSITIONS: { suffix: string; slug: string; pf: number }[] = [
+  { suffix: "Sideline (Near)", slug: "sideline-near", pf: 1 },
+  { suffix: "Sideline (Far)", slug: "sideline-far", pf: 1 },
+  { suffix: "Baseline (Left)", slug: "baseline-left", pf: 0.4 },
+  { suffix: "Baseline (Right)", slug: "baseline-right", pf: 0.4 },
+  { suffix: "Corner (Near Left)", slug: "corner-near-left", pf: 0 },
+  { suffix: "Corner (Near Right)", slug: "corner-near-right", pf: 0 },
+  { suffix: "Corner (Far Left)", slug: "corner-far-left", pf: 0 },
+  { suffix: "Corner (Far Right)", slug: "corner-far-right", pf: 0 },
+];
+
+function buildArenaSections(fromPrice: number): Section[] {
+  const sections: Section[] = [];
+  let seed = 0;
+  // base = corner (pf 0) multiplier; base + spread = sideline (pf 1) multiplier.
+  const tiers: { level: SectionLevel; base: number; spread: number }[] = [
+    { level: "Lower", base: 2.6, spread: 1.5 }, // corner 2.6x → sideline 4.1x
+    { level: "Club", base: 1.7, spread: 0.85 }, // corner 1.7x → sideline 2.55x
+    { level: "Upper", base: 1.0, spread: 0.6 }, // corner 1.0x → sideline 1.6x
+  ];
+  tiers.forEach(({ level, base, spread }) => {
+    ARENA_POSITIONS.forEach(({ suffix, slug, pf }) => {
+      const price = Math.round(fromPrice * (base + spread * pf));
+      sections.push({
+        id: `${level.toLowerCase()}-${slug}`,
+        name: `${level} ${suffix}`,
+        level,
+        price,
+        platforms: sectionPlatforms(price, seed++),
+      });
+    });
+  });
+  return sections;
+}
+
 export interface SeatEvent {
   id: string;
   name: string;
   category: EventCategory;
+  venueType: VenueType; // which stadium-map layout to load
   date: string; // ISO date, e.g. "2026-08-14"
   time: string; // e.g. "7:30 PM"
   venue: string;
@@ -102,8 +146,9 @@ export interface SeatEvent {
 }
 
 // Hardcoded mock data — swap this out for real API results later.
-// Sections are attached below via .map() so the shared bowl isn't duplicated per event.
-const eventsWithoutSections: Omit<SeatEvent, "sections">[] = [
+// venueType + sections are attached below via .map() so they aren't hand-written
+// per event. To add an event's venue type, add it to VENUE_TYPE below.
+const eventsWithoutSections: Omit<SeatEvent, "sections" | "venueType">[] = [
   {
     id: "taylor-swift-metlife",
     name: "Taylor Swift — The Eras Tour",
@@ -456,11 +501,34 @@ const eventsWithoutSections: Omit<SeatEvent, "sections">[] = [
   },
 ];
 
-// Attach a bowl scaled to each event's fromPrice. Swap for per-venue data later.
-export const mockEvents: SeatEvent[] = eventsWithoutSections.map((event) => ({
-  ...event,
-  sections: buildSectionsForEvent(event.fromPrice),
-}));
+// Venue type per event — concerts, basketball/hockey arenas, football stadiums,
+// baseball parks. Extend this map as events are added; "stadium"/"baseball" use
+// the concert map for now until their own maps ship.
+const VENUE_TYPE: Record<string, VenueType> = {
+  "taylor-swift-metlife": "concert",
+  "knicks-vs-celtics-msg": "arena",
+  "zach-bryan-fenway": "concert",
+  "lakers-vs-warriors-crypto": "arena",
+  "billie-eilish-united-center": "concert",
+  "cowboys-vs-eagles-att": "stadium",
+  "morgan-wallen-nissan": "concert",
+  "yankees-vs-red-sox-yankee": "baseball",
+  "sabrina-carpenter-kia": "concert",
+  "heat-vs-bucks-kaseya": "arena",
+};
+
+// Attach venue type + a section layout scaled to each event's fromPrice.
+export const mockEvents: SeatEvent[] = eventsWithoutSections.map((event) => {
+  const venueType = VENUE_TYPE[event.id] ?? "concert";
+  return {
+    ...event,
+    venueType,
+    sections:
+      venueType === "arena"
+        ? buildArenaSections(event.fromPrice)
+        : buildConcertSections(event.fromPrice),
+  };
+});
 
 export function getEventById(id: string): SeatEvent | undefined {
   return mockEvents.find((event) => event.id === id);

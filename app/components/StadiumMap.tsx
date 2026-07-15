@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Section, SectionLevel } from "../data/mockEvents";
+import { SeatingMapCanvas, type LaidOutSection, type ZoneLabel } from "./SeatingMapCanvas";
 
 // --- Canvas ---
 const VIEW_W = 800;
@@ -30,8 +31,7 @@ const TIER_RINGS: Record<Exclude<SectionLevel, "Floor">, TierRing> = {
   Upper: { inner: 322, outer: 380 },
 };
 
-// Quiet zone labels placed over the map for legibility.
-const ZONE_LABELS = [
+const ZONE_LABELS: ZoneLabel[] = [
   { text: "GA FLOOR", x: 400, y: 213 },
   { text: "LOWER", x: 400, y: 529 },
   { text: "CLUB", x: 400, y: 600 },
@@ -39,7 +39,6 @@ const ZONE_LABELS = [
 ];
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
-const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 // Circular annular-sector path between two angles (degrees).
 function arcSectorPath(inner: number, outer: number, a0deg: number, a1deg: number): string {
@@ -60,24 +59,6 @@ function arcSectorPath(inner: number, outer: number, a0deg: number, a1deg: numbe
   ].join(" ");
 }
 
-// Green (#00AA6C) → Amber (#F5A623) heatmap in HSL (vivid yellow-green midpoint).
-function heatColor(t: number, lift = 0): string {
-  const h = 158 - 119 * t;
-  const s = 100 - 9 * t;
-  const l = 33 + 22 * t + lift;
-  return `hsl(${h.toFixed(0)} ${s.toFixed(0)}% ${l.toFixed(0)}%)`;
-}
-
-interface LaidOutSection {
-  section: Section;
-  shape:
-    | { kind: "rect"; x: number; y: number; w: number; h: number }
-    | { kind: "path"; d: string };
-  centroid: { x: number; y: number };
-  color: string;
-  activeColor: string;
-}
-
 export function StadiumMap({
   sections,
   centerLabel = "STAGE",
@@ -89,26 +70,7 @@ export function StadiumMap({
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
 }) {
-  const [hoverId, setHoverId] = useState<string | null>(null);
-  const tooltipId = hoverId ?? selectedId;
-
   const laidOut = useMemo<LaidOutSection[]>(() => {
-    const prices = sections.map((s) => s.price);
-    // Rank-based color: spread the gradient evenly across all sections so the
-    // priciest bowl sections read as warm/amber, not squished into green by the
-    // much-more-expensive floor. Ties (equal prices) share the same color.
-    const sorted = [...prices].sort((a, b) => a - b);
-    const n = prices.length;
-    const rankT = (p: number) => {
-      if (n <= 1) return 0;
-      const avgIndex = (sorted.indexOf(p) + sorted.lastIndexOf(p)) / 2;
-      return avgIndex / (n - 1);
-    };
-    const withColor = (section: Section, shape: LaidOutSection["shape"], centroid: { x: number; y: number }) => {
-      const t = rankT(section.price);
-      return { section, shape, centroid, color: heatColor(t), activeColor: heatColor(t, 9) };
-    };
-
     const out: LaidOutSection[] = [];
 
     // Floor bands (stacked front → back)
@@ -116,176 +78,60 @@ export function StadiumMap({
     const bandH = (FLOOR.h - FLOOR.gap * (floor.length - 1)) / floor.length;
     floor.forEach((section, i) => {
       const y = FLOOR.y + i * (bandH + FLOOR.gap);
-      out.push(
-        withColor(section, { kind: "rect", x: FLOOR.x, y, w: FLOOR.w, h: bandH }, { x: FLOOR.x + FLOOR.w / 2, y: y + bandH / 2 })
-      );
+      out.push({
+        section,
+        shape: { kind: "rect", x: FLOOR.x, y, w: FLOOR.w, h: bandH, rx: 6 },
+        centroid: { x: FLOOR.x + FLOOR.w / 2, y: y + bandH / 2 },
+      });
     });
 
-    // Arc tiers
+    // Arc tiers (4 sections each; index 0 = Left/west → Right/east)
     (Object.keys(TIER_RINGS) as (keyof typeof TIER_RINGS)[]).forEach((level) => {
       const ring = TIER_RINGS[level];
       const group = sections.filter((s) => s.level === level);
       const step = (ARC_A1 - ARC_A0) / group.length;
-      // Index 0 = Left (west end), increasing toward Right (east end).
       group.forEach((section, i) => {
         const a0 = ARC_A1 - (i + 1) * step + ARC_GAP_DEG / 2;
         const a1 = ARC_A1 - i * step - ARC_GAP_DEG / 2;
         const mid = rad((a0 + a1) / 2);
         const midR = (ring.inner + ring.outer) / 2;
-        out.push(
-          withColor(
-            section,
-            { kind: "path", d: arcSectorPath(ring.inner, ring.outer, a0, a1) },
-            { x: ARC_CX + midR * Math.cos(mid), y: ARC_CY + midR * Math.sin(mid) }
-          )
-        );
+        out.push({
+          section,
+          shape: { kind: "path", d: arcSectorPath(ring.inner, ring.outer, a0, a1) },
+          centroid: { x: ARC_CX + midR * Math.cos(mid), y: ARC_CY + midR * Math.sin(mid) },
+        });
       });
     });
 
     return out;
   }, [sections]);
 
-  const active = laidOut.find((s) => s.section.id === tooltipId) ?? null;
-
-  const handleClick = (id: string) => onSelect?.(selectedId === id ? null : id);
+  const centerContent = (
+    <>
+      <rect x={STAGE.x} y={STAGE.y} width={STAGE.w} height={STAGE.h} rx={8} fill="#0F172A" />
+      <text
+        x={STAGE.x + STAGE.w / 2}
+        y={STAGE.y + STAGE.h / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="fill-white"
+        style={{ fontSize: 20, fontWeight: 800, letterSpacing: 6 }}
+      >
+        {centerLabel}
+      </text>
+    </>
+  );
 
   return (
-    <div className="w-full">
-      <svg
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        className="h-auto w-full select-none"
-        style={{ touchAction: "manipulation" }}
-        role="img"
-        aria-label="Concert venue seating map, color-coded by price"
-      >
-        <defs>
-          <filter id="tooltipShadow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#0F172A" floodOpacity="0.16" />
-          </filter>
-          <filter id="bowlShadow" x="-10%" y="-10%" width="120%" height="120%">
-            <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0F172A" floodOpacity="0.12" />
-          </filter>
-        </defs>
-
-        {/* Backdrop — tapping empty space clears the selection */}
-        <rect x="0" y="0" width={VIEW_W} height={VIEW_H} fill="transparent" onClick={() => onSelect?.(null)} />
-
-        {/* Stage */}
-        <rect x={STAGE.x} y={STAGE.y} width={STAGE.w} height={STAGE.h} rx={8} fill="#0F172A" />
-        <text
-          x={STAGE.x + STAGE.w / 2}
-          y={STAGE.y + STAGE.h / 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          className="fill-white"
-          style={{ fontSize: 20, fontWeight: 800, letterSpacing: 6 }}
-        >
-          {centerLabel}
-        </text>
-
-        {/* Sections (with a soft group shadow for subtle depth) */}
-        <g filter="url(#bowlShadow)">
-          {laidOut.map(({ section, shape, color, activeColor }) => {
-            const isSelected = section.id === selectedId;
-            const isHover = section.id === hoverId;
-            const isActive = isSelected || isHover;
-            const common = {
-              fill: isActive ? activeColor : color,
-              stroke: isActive ? "#0F172A" : "#FFFFFF",
-              strokeWidth: isSelected ? 3 : isHover ? 2.25 : 2,
-              strokeLinejoin: "round" as const,
-              className: "cursor-pointer transition-[stroke,fill] duration-150",
-              onMouseEnter: () => setHoverId(section.id),
-              onMouseLeave: () => setHoverId(null),
-              onClick: (e: React.MouseEvent) => {
-                e.stopPropagation();
-                handleClick(section.id);
-              },
-            };
-            const title = <title>{`${section.name} — from $${section.price}`}</title>;
-            return shape.kind === "rect" ? (
-              <rect key={section.id} x={shape.x} y={shape.y} width={shape.w} height={shape.h} rx={6} {...common}>
-                {title}
-              </rect>
-            ) : (
-              <path key={section.id} d={shape.d} {...common}>
-                {title}
-              </path>
-            );
-          })}
-        </g>
-
-        {/* Zone labels on soft white pills for clear legibility */}
-        <g pointerEvents="none">
-          {ZONE_LABELS.map((z) => {
-            const w = z.text.length * 8.4 + 20;
-            const h = 21;
-            return (
-              <g key={z.text}>
-                <rect
-                  x={z.x - w / 2}
-                  y={z.y - h / 2}
-                  width={w}
-                  height={h}
-                  rx={h / 2}
-                  fill="#FFFFFF"
-                  fillOpacity={0.9}
-                  stroke="#E5E9EE"
-                  strokeOpacity={0.9}
-                />
-                <text
-                  x={z.x}
-                  y={z.y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: 1.2, fill: "#0F172A" }}
-                >
-                  {z.text}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-
-        {/* Price tooltip for the hovered/selected section */}
-        {active && (
-          <g pointerEvents="none">
-            {(() => {
-              const w = 118;
-              const h = 46;
-              const x = clamp(active.centroid.x, w / 2 + 6, VIEW_W - w / 2 - 6);
-              const y = clamp(active.centroid.y, h / 2 + 6, VIEW_H - h / 2 - 6);
-              return (
-                <>
-                  <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={10} fill="#FFFFFF" stroke="#E5E9EE" filter="url(#tooltipShadow)" />
-                  <text x={x} y={y - 7} textAnchor="middle" className="fill-gray-500" style={{ fontSize: 12, fontWeight: 600 }}>
-                    {active.section.name}
-                  </text>
-                  <text x={x} y={y + 13} textAnchor="middle" className="fill-midnight" style={{ fontSize: 16, fontWeight: 800 }}>
-                    from ${active.section.price}
-                  </text>
-                </>
-              );
-            })()}
-          </g>
-        )}
-      </svg>
-
-      {/* Legend */}
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-        <span className="text-xs font-semibold text-gray-500">$ Cheaper</span>
-        <div
-          className="h-2.5 w-36 rounded-full sm:w-44"
-          style={{ background: "linear-gradient(90deg, hsl(158 100% 33%), hsl(98 96% 44%), hsl(39 91% 55%))" }}
-        />
-        <span className="text-xs font-semibold text-gray-500">Pricier $$$</span>
-      </div>
-      <p className="mt-2 text-center text-xs text-gray-400">
-        Hover or tap a section to see its starting price
-      </p>
-      <p className="mt-1 text-center text-[11px] text-gray-400">
-        Generalized seating layout — actual section names and positions may vary by venue.
-      </p>
-    </div>
+    <SeatingMapCanvas
+      viewW={VIEW_W}
+      viewH={VIEW_H}
+      sections={sections}
+      laidOut={laidOut}
+      zoneLabels={ZONE_LABELS}
+      centerContent={centerContent}
+      selectedId={selectedId}
+      onSelect={onSelect}
+    />
   );
 }

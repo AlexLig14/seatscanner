@@ -26,6 +26,19 @@ function CategoryBadge({ category }: { category: SeatEvent["category"] }) {
   );
 }
 
+// Label for the center of the map. Arenas are basketball here (COURT); hockey
+// venues would pass "RINK". stadium/baseball use the concert map for now (FIELD).
+function centerLabelFor(venueType: SeatEvent["venueType"]): string {
+  switch (venueType) {
+    case "concert":
+      return "STAGE";
+    case "arena":
+      return "COURT";
+    default:
+      return "FIELD";
+  }
+}
+
 export default async function EventDetailPage({
   params,
 }: {
@@ -73,10 +86,7 @@ export default async function EventDetailPage({
         </section>
 
         {/* Stadium map (left) + section-aware price comparison (right) */}
-        <SeatingSection
-          event={event}
-          centerLabel={event.category === "concert" ? "STAGE" : "FIELD"}
-        />
+        <SeatingSection event={event} centerLabel={centerLabelFor(event.venueType)} />
 
         {/* Buy now vs. wait — price prediction (full width, below) */}
         <PricePrediction prediction={event.prediction} />
