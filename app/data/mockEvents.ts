@@ -91,36 +91,39 @@ function buildConcertSections(fromPrice: number): Section[] {
   return sections;
 }
 
+export type Sport = "basketball" | "hockey";
+
 // A basketball/hockey ARENA bowl: a full wrap of 8 sections per tier around the
-// court/rink. Sidelines (long sides) are premium, baselines (short ends) mid,
-// corners cheapest. The ArenaMap positions each section by its id slug, so this
-// order is not load-bearing. pf: corner 0 → baseline 0.4 → sideline 1.
-const ARENA_POSITIONS: { suffix: string; slug: string; pf: number }[] = [
-  { suffix: "Sideline (Near)", slug: "sideline-near", pf: 1 },
-  { suffix: "Sideline (Far)", slug: "sideline-far", pf: 1 },
-  { suffix: "Baseline (Left)", slug: "baseline-left", pf: 0.4 },
-  { suffix: "Baseline (Right)", slug: "baseline-right", pf: 0.4 },
-  { suffix: "Corner (Near Left)", slug: "corner-near-left", pf: 0 },
-  { suffix: "Corner (Near Right)", slug: "corner-near-right", pf: 0 },
-  { suffix: "Corner (Far Left)", slug: "corner-far-left", pf: 0 },
-  { suffix: "Corner (Far Right)", slug: "corner-far-right", pf: 0 },
+// court/rink. Long sides are premium, short ends mid, corners cheapest. The
+// ArenaMap positions each section by its id slug, so this order is not
+// load-bearing. Section names differ by sport; slugs and pricing do not.
+// pf: corner 0 → end 0.4 → side 1.
+const ARENA_POSITIONS: { slug: string; pf: number; basketball: string; hockey: string }[] = [
+  { slug: "sideline-near", pf: 1, basketball: "Sideline (Near)", hockey: "Side (Near)" },
+  { slug: "sideline-far", pf: 1, basketball: "Sideline (Far)", hockey: "Side (Far)" },
+  { slug: "baseline-left", pf: 0.4, basketball: "Baseline (Left)", hockey: "Goal End (Left)" },
+  { slug: "baseline-right", pf: 0.4, basketball: "Baseline (Right)", hockey: "Goal End (Right)" },
+  { slug: "corner-near-left", pf: 0, basketball: "Corner (Near Left)", hockey: "Corner (Near Left)" },
+  { slug: "corner-near-right", pf: 0, basketball: "Corner (Near Right)", hockey: "Corner (Near Right)" },
+  { slug: "corner-far-left", pf: 0, basketball: "Corner (Far Left)", hockey: "Corner (Far Left)" },
+  { slug: "corner-far-right", pf: 0, basketball: "Corner (Far Right)", hockey: "Corner (Far Right)" },
 ];
 
-function buildArenaSections(fromPrice: number): Section[] {
+function buildArenaSections(fromPrice: number, sport: Sport): Section[] {
   const sections: Section[] = [];
   let seed = 0;
-  // base = corner (pf 0) multiplier; base + spread = sideline (pf 1) multiplier.
+  // base = corner (pf 0) multiplier; base + spread = side (pf 1) multiplier.
   const tiers: { level: SectionLevel; base: number; spread: number }[] = [
-    { level: "Lower", base: 2.6, spread: 1.5 }, // corner 2.6x → sideline 4.1x
-    { level: "Club", base: 1.7, spread: 0.85 }, // corner 1.7x → sideline 2.55x
-    { level: "Upper", base: 1.0, spread: 0.6 }, // corner 1.0x → sideline 1.6x
+    { level: "Lower", base: 2.6, spread: 1.5 }, // corner 2.6x → side 4.1x
+    { level: "Club", base: 1.7, spread: 0.85 }, // corner 1.7x → side 2.55x
+    { level: "Upper", base: 1.0, spread: 0.6 }, // corner 1.0x → side 1.6x
   ];
   tiers.forEach(({ level, base, spread }) => {
-    ARENA_POSITIONS.forEach(({ suffix, slug, pf }) => {
-      const price = Math.round(fromPrice * (base + spread * pf));
+    ARENA_POSITIONS.forEach((pos) => {
+      const price = Math.round(fromPrice * (base + spread * pos.pf));
       sections.push({
-        id: `${level.toLowerCase()}-${slug}`,
-        name: `${level} ${suffix}`,
+        id: `${level.toLowerCase()}-${pos.slug}`,
+        name: `${level} ${sport === "hockey" ? pos.hockey : pos.basketball}`,
         level,
         price,
         platforms: sectionPlatforms(price, seed++),
@@ -135,6 +138,7 @@ export interface SeatEvent {
   name: string;
   category: EventCategory;
   venueType: VenueType; // which stadium-map layout to load
+  sport?: Sport; // for arena events: basketball (COURT) or hockey (RINK)
   date: string; // ISO date, e.g. "2026-08-14"
   time: string; // e.g. "7:30 PM"
   venue: string;
@@ -148,7 +152,7 @@ export interface SeatEvent {
 // Hardcoded mock data — swap this out for real API results later.
 // venueType + sections are attached below via .map() so they aren't hand-written
 // per event. To add an event's venue type, add it to VENUE_TYPE below.
-const eventsWithoutSections: Omit<SeatEvent, "sections" | "venueType">[] = [
+const eventsWithoutSections: Omit<SeatEvent, "sections" | "venueType" | "sport">[] = [
   {
     id: "taylor-swift-metlife",
     name: "Taylor Swift — The Eras Tour",
@@ -499,6 +503,42 @@ const eventsWithoutSections: Omit<SeatEvent, "sections" | "venueType">[] = [
       ],
     },
   },
+  {
+    id: "rangers-vs-bruins-msg",
+    name: "Rangers vs Bruins",
+    category: "sports",
+    date: "2026-10-03",
+    time: "7:00 PM",
+    venue: "Madison Square Garden",
+    city: "New York, NY",
+    fromPrice: 95,
+    platforms: [
+      { platform: "SeatGeek", price: 95 },
+      { platform: "Ticketmaster", price: 118 },
+      { platform: "Vivid Seats", price: 104 },
+      { platform: "StubHub", price: 110 },
+    ],
+    prediction: {
+      recommendation: "wait",
+      confidence: "Medium",
+      reasoning:
+        "Early-season games usually soften a bit, and prices have slipped for two weeks straight.",
+      priceHistory: [
+        { date: "May 4", price: 128 },
+        { date: "May 11", price: 125 },
+        { date: "May 18", price: 121 },
+        { date: "May 25", price: 122 },
+        { date: "Jun 1", price: 117 },
+        { date: "Jun 8", price: 113 },
+        { date: "Jun 15", price: 110 },
+        { date: "Jun 22", price: 108 },
+        { date: "Jun 29", price: 104 },
+        { date: "Jul 6", price: 101 },
+        { date: "Jul 13", price: 98 },
+        { date: "Jul 20", price: 95 },
+      ],
+    },
+  },
 ];
 
 // Venue type per event — concerts, basketball/hockey arenas, football stadiums,
@@ -515,17 +555,28 @@ const VENUE_TYPE: Record<string, VenueType> = {
   "yankees-vs-red-sox-yankee": "baseball",
   "sabrina-carpenter-kia": "concert",
   "heat-vs-bucks-kaseya": "arena",
+  "rangers-vs-bruins-msg": "arena",
 };
 
-// Attach venue type + a section layout scaled to each event's fromPrice.
+// Sport for arena events — drives COURT vs RINK and basketball vs hockey names.
+const SPORT: Record<string, Sport> = {
+  "knicks-vs-celtics-msg": "basketball",
+  "lakers-vs-warriors-crypto": "basketball",
+  "heat-vs-bucks-kaseya": "basketball",
+  "rangers-vs-bruins-msg": "hockey",
+};
+
+// Attach venue type, sport, and a section layout scaled to each event's fromPrice.
 export const mockEvents: SeatEvent[] = eventsWithoutSections.map((event) => {
   const venueType = VENUE_TYPE[event.id] ?? "concert";
+  const sport = SPORT[event.id];
   return {
     ...event,
     venueType,
+    sport,
     sections:
       venueType === "arena"
-        ? buildArenaSections(event.fromPrice)
+        ? buildArenaSections(event.fromPrice, sport ?? "basketball")
         : buildConcertSections(event.fromPrice),
   };
 });

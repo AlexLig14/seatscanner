@@ -26,14 +26,14 @@ function CategoryBadge({ category }: { category: SeatEvent["category"] }) {
   );
 }
 
-// Label for the center of the map. Arenas are basketball here (COURT); hockey
-// venues would pass "RINK". stadium/baseball use the concert map for now (FIELD).
-function centerLabelFor(venueType: SeatEvent["venueType"]): string {
-  switch (venueType) {
+// Label for the center of the map. Arenas show COURT for basketball, RINK for
+// hockey. stadium/baseball use the concert map for now (FIELD).
+function centerLabelFor(event: SeatEvent): string {
+  switch (event.venueType) {
     case "concert":
       return "STAGE";
     case "arena":
-      return "COURT";
+      return event.sport === "hockey" ? "RINK" : "COURT";
     default:
       return "FIELD";
   }
@@ -86,7 +86,7 @@ export default async function EventDetailPage({
         </section>
 
         {/* Stadium map (left) + section-aware price comparison (right) */}
-        <SeatingSection event={event} centerLabel={centerLabelFor(event.venueType)} />
+        <SeatingSection event={event} centerLabel={centerLabelFor(event)} />
 
         {/* Buy now vs. wait — price prediction (full width, below) */}
         <PricePrediction prediction={event.prediction} />
