@@ -2,76 +2,114 @@
 
 import { useMemo } from "react";
 import type { Section, SectionLevel } from "../data/mockEvents";
-import { SeatingMapCanvas, type LaidOutSection, type ZoneLabel } from "./SeatingMapCanvas";
+import { SeatingMapCanvas, type LaidOutSection, type MapShape, type ZoneLabel } from "./SeatingMapCanvas";
 
-// --- Canvas ---
-const VIEW_W = 800;
-const VIEW_H = 680;
-const CX = 400;
-const CY = 335;
+// --- Canvas (noticeably wider than tall, like a real arena footprint) ---
+const VIEW_W = 780;
+const VIEW_H = 600;
+const CX = 390;
+const CY = 300;
 
-// --- Court / rink (horizontal rectangle in the center) ---
-const COURT = { x: 300, y: 285, w: 200, h: 100 };
+// --- Court / rink: a large central rectangle at ~1.9:1 (94ft × 50ft) ---
+const HW_C = 180; // court half-width
+const HH_C = 95; //  court half-height (360 × 190 ≈ 1.9:1)
+const COURT = { x: CX - HW_C, y: CY - HH_C, w: HW_C * 2, h: HH_C * 2 };
 
-// --- Concentric elliptical tiers wrapping fully around the court ---
-interface Ellip {
-  iRx: number;
-  iRy: number;
-  oRx: number;
-  oRy: number;
+// The seating bowl is a rounded rectangle hugging the court. Each tier ring is a
+// band offset outward from the court edge; a small apron sits between the court
+// and the Lower ring. Corner arcs are centered exactly on the court's corners.
+interface Ring {
+  innerR: number; // distance from the court edge to the ring's inner face
+  outerR: number;
 }
-const RINGS: Record<Exclude<SectionLevel, "Floor">, Ellip> = {
-  Lower: { iRx: 145, iRy: 90, oRx: 220, oRy: 150 },
-  Club: { iRx: 233, iRy: 163, oRx: 308, oRy: 223 },
-  Upper: { iRx: 321, iRy: 236, oRx: 385, oRy: 296 },
+const RINGS: Record<Exclude<SectionLevel, "Floor">, Ring> = {
+  Lower: { innerR: 16, outerR: 68 }, // 16px apron, ~52px thick
+  Club: { innerR: 76, outerR: 128 },
+  Upper: { innerR: 136, outerR: 188 },
 };
 
-// Center angle (deg, SVG y-down) for each section position around the bowl.
-// Court is horizontal, so top/bottom arcs are the long sidelines, left/right the
-// short baselines, and the diagonals are corners.
-const SLUG_ANGLE: Record<string, number> = {
-  "sideline-near": 90, // bottom (long side, near viewer)
-  "sideline-far": 270, // top (long side, far)
-  "baseline-right": 0, // right end
-  "baseline-left": 180, // left end
-  "corner-near-right": 45,
-  "corner-near-left": 135,
-  "corner-far-left": 225,
-  "corner-far-right": 315,
-};
-const SECTOR_HALF = 22.5; // 8 sections × 45°
-const GAP_DEG = 2;
+const G = 6; // linear gap between adjacent straight sections
 
-// Tier labels sit at the bottom (near sideline) of each ring.
-const ZONE_LABELS: ZoneLabel[] = [
-  { text: "LOWER", x: CX, y: CY + (RINGS.Lower.iRy + RINGS.Lower.oRy) / 2 },
-  { text: "CLUB", x: CX, y: CY + (RINGS.Club.iRy + RINGS.Club.oRy) / 2 },
-  { text: "UPPER", x: CX, y: CY + (RINGS.Upper.iRy + RINGS.Upper.oRy) / 2 },
-];
+// Corner arc centers (the court's four corners) and their 90° sweep.
+const CORNERS: Record<string, { cx: number; cy: number; a0: number; a1: number }> = {
+  "corner-far-right": { cx: CX + HW_C, cy: CY - HH_C, a0: 270, a1: 360 }, // top-right
+  "corner-far-left": { cx: CX - HW_C, cy: CY - HH_C, a0: 180, a1: 270 }, // top-left
+  "corner-near-right": { cx: CX + HW_C, cy: CY + HH_C, a0: 0, a1: 90 }, // bottom-right
+  "corner-near-left": { cx: CX - HW_C, cy: CY + HH_C, a0: 90, a1: 180 }, // bottom-left
+};
+
+// Tier labels sit on the near (bottom) sideline of each ring.
+const ZONE_LABELS: ZoneLabel[] = (["Lower", "Club", "Upper"] as const).map((lvl) => ({
+  text: lvl.toUpperCase(),
+  x: CX,
+  y: CY + HH_C + (RINGS[lvl].innerR + RINGS[lvl].outerR) / 2,
+}));
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
-// Elliptical annular-sector path between two angles (degrees).
-function ellipticalSectorPath(iRx: number, iRy: number, oRx: number, oRy: number, a0deg: number, a1deg: number): string {
+// Circular annular-sector path centered at an arbitrary point (used for corners).
+function annSector(ccx: number, ccy: number, ri: number, ro: number, a0deg: number, a1deg: number): string {
   const a0 = rad(a0deg);
   const a1 = rad(a1deg);
-  const pt = (rx: number, ry: number, a: number) => [CX + rx * Math.cos(a), CY + ry * Math.sin(a)];
-  const [x0o, y0o] = pt(oRx, oRy, a0);
-  const [x1o, y1o] = pt(oRx, oRy, a1);
-  const [x1i, y1i] = pt(iRx, iRy, a1);
-  const [x0i, y0i] = pt(iRx, iRy, a0);
+  const pt = (r: number, a: number) => [ccx + r * Math.cos(a), ccy + r * Math.sin(a)];
+  const [x0o, y0o] = pt(ro, a0);
+  const [x1o, y1o] = pt(ro, a1);
+  const [x1i, y1i] = pt(ri, a1);
+  const [x0i, y0i] = pt(ri, a0);
   const large = a1deg - a0deg > 180 ? 1 : 0;
   return [
     `M${x0o.toFixed(2)},${y0o.toFixed(2)}`,
-    `A${oRx},${oRy} 0 ${large} 1 ${x1o.toFixed(2)},${y1o.toFixed(2)}`,
+    `A${ro},${ro} 0 ${large} 1 ${x1o.toFixed(2)},${y1o.toFixed(2)}`,
     `L${x1i.toFixed(2)},${y1i.toFixed(2)}`,
-    `A${iRx},${iRy} 0 ${large} 0 ${x0i.toFixed(2)},${y0i.toFixed(2)}`,
+    `A${ri},${ri} 0 ${large} 0 ${x0i.toFixed(2)},${y0i.toFixed(2)}`,
     "Z",
   ].join(" ");
 }
 
 function slugOf(id: string): string {
   return id.split("-").slice(1).join("-");
+}
+
+// Geometry for one section (identified by slug) within a tier ring.
+function shapeFor(slug: string, ring: Ring): { shape: MapShape; centroid: { x: number; y: number } } {
+  const { innerR, outerR } = ring;
+  const midR = (innerR + outerR) / 2;
+
+  switch (slug) {
+    case "sideline-far": // straight band above the court (top)
+      return {
+        shape: { kind: "rect", x: CX - HW_C + G, y: CY - HH_C - outerR, w: 2 * HW_C - 2 * G, h: outerR - innerR, rx: 3 },
+        centroid: { x: CX, y: CY - HH_C - midR },
+      };
+    case "sideline-near": // straight band below the court (bottom)
+      return {
+        shape: { kind: "rect", x: CX - HW_C + G, y: CY + HH_C + innerR, w: 2 * HW_C - 2 * G, h: outerR - innerR, rx: 3 },
+        centroid: { x: CX, y: CY + HH_C + midR },
+      };
+    case "baseline-left": // straight band left of the court
+      return {
+        shape: { kind: "rect", x: CX - HW_C - outerR, y: CY - HH_C + G, w: outerR - innerR, h: 2 * HH_C - 2 * G, rx: 3 },
+        centroid: { x: CX - HW_C - midR, y: CY },
+      };
+    case "baseline-right": // straight band right of the court
+      return {
+        shape: { kind: "rect", x: CX + HW_C + innerR, y: CY - HH_C + G, w: outerR - innerR, h: 2 * HH_C - 2 * G, rx: 3 },
+        centroid: { x: CX + HW_C + midR, y: CY },
+      };
+    default: {
+      // Curved corner arc centered on the court's corner.
+      const c = CORNERS[slug];
+      const deltaDeg = clamp((G / midR) * (180 / Math.PI), 2.5, 6);
+      const a0 = c.a0 + deltaDeg;
+      const a1 = c.a1 - deltaDeg;
+      const midA = rad((a0 + a1) / 2);
+      return {
+        shape: { kind: "path", d: annSector(c.cx, c.cy, innerR, outerR, a0, a1) },
+        centroid: { x: c.cx + midR * Math.cos(midA), y: c.cy + midR * Math.sin(midA) },
+      };
+    }
+  }
 }
 
 export function ArenaMap({
@@ -92,17 +130,12 @@ export function ArenaMap({
       sections
         .filter((s) => s.level === level)
         .forEach((section) => {
-          const angle = SLUG_ANGLE[slugOf(section.id)];
-          if (angle === undefined) return;
-          const a0 = angle - SECTOR_HALF + GAP_DEG / 2;
-          const a1 = angle + SECTOR_HALF - GAP_DEG / 2;
-          const midRx = (ring.iRx + ring.oRx) / 2;
-          const midRy = (ring.iRy + ring.oRy) / 2;
-          out.push({
-            section,
-            shape: { kind: "path", d: ellipticalSectorPath(ring.iRx, ring.iRy, ring.oRx, ring.oRy, a0, a1) },
-            centroid: { x: CX + midRx * Math.cos(rad(angle)), y: CY + midRy * Math.sin(rad(angle)) },
-          });
+          const slug = slugOf(section.id);
+          if (slug !== "sideline-far" && slug !== "sideline-near" && slug !== "baseline-left" && slug !== "baseline-right" && !CORNERS[slug]) {
+            return;
+          }
+          const { shape, centroid } = shapeFor(slug, ring);
+          out.push({ section, shape, centroid });
         });
     });
     return out;
@@ -117,7 +150,7 @@ export function ArenaMap({
         textAnchor="middle"
         dominantBaseline="central"
         className="fill-white"
-        style={{ fontSize: 20, fontWeight: 800, letterSpacing: 6 }}
+        style={{ fontSize: 22, fontWeight: 800, letterSpacing: 7 }}
       >
         {centerLabel}
       </text>
