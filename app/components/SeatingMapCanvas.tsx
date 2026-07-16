@@ -21,13 +21,23 @@ export interface ZoneLabel {
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
-// Green (#00AA6C) → Amber (#F5A623) heatmap in HSL (vivid yellow-green midpoint).
+// Green (#00AA6C) → Amber (#F5A623) heatmap in HSL. Hue space isn't perceptually
+// even — ~158°→80° is all green and only ~60°→39° reads warm — so a linear ramp
+// leaves the map green-dominant. We ease t (t^0.6) so it moves through the green
+// range quickly and spends most of the scale in yellow/gold/amber: cheap sections
+// stay green, mid-priced read gold, premium read amber.
 function heatColor(t: number, lift = 0): string {
-  const h = 158 - 119 * t;
-  const s = 100 - 9 * t;
-  const l = 33 + 22 * t + lift;
+  const te = Math.pow(clamp(t, 0, 1), 0.6);
+  const h = 158 - 119 * te;
+  const s = 100 - 9 * te;
+  const l = 33 + 22 * te + lift;
   return `hsl(${h.toFixed(0)} ${s.toFixed(0)}% ${l.toFixed(0)}%)`;
 }
+
+// Legend gradient sampled from heatColor so the bar always matches the map.
+const LEGEND_GRADIENT = `linear-gradient(90deg, ${[0, 0.2, 0.4, 0.6, 0.8, 1]
+  .map((t) => heatColor(t))
+  .join(", ")})`;
 
 /**
  * Shared renderer for every stadium-map type (concert, arena, …). Each map
@@ -87,9 +97,6 @@ export function SeatingMapCanvas({
         aria-label="Seating map, color-coded by price"
       >
         <defs>
-          <filter id="tooltipShadow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#0F172A" floodOpacity="0.16" />
-          </filter>
           <filter id="bowlShadow" x="-10%" y="-10%" width="120%" height="120%">
             <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0F172A" floodOpacity="0.12" />
           </filter>
@@ -150,37 +157,42 @@ export function SeatingMapCanvas({
           })}
         </g>
 
-        {/* Price tooltip for the hovered/selected section */}
-        {active && (
-          <g pointerEvents="none">
-            {(() => {
-              const w = 118;
-              const h = 46;
-              const x = clamp(active.centroid.x, w / 2 + 6, viewW - w / 2 - 6);
-              const y = clamp(active.centroid.y, h / 2 + 6, viewH - h / 2 - 6);
-              return (
-                <>
-                  <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={10} fill="#FFFFFF" stroke="#E5E9EE" filter="url(#tooltipShadow)" />
-                  <text x={x} y={y - 7} textAnchor="middle" className="fill-gray-500" style={{ fontSize: 12, fontWeight: 600 }}>
-                    {active.section.name}
-                  </text>
-                  <text x={x} y={y + 13} textAnchor="middle" className="fill-midnight" style={{ fontSize: 16, fontWeight: 800 }}>
-                    from ${active.section.price}
-                  </text>
-                </>
-              );
-            })()}
-          </g>
-        )}
+        {/* Price tooltip — HTML in a foreignObject so it sizes to content, wraps
+            long names, and stays within the map bounds. */}
+        {active &&
+          (() => {
+            const boxW = 178;
+            const boxH = 78;
+            const x = clamp(active.centroid.x, boxW / 2 + 4, viewW - boxW / 2 - 4);
+            const y = clamp(active.centroid.y, boxH / 2 + 4, viewH - boxH / 2 - 4);
+            return (
+              <foreignObject
+                x={x - boxW / 2}
+                y={y - boxH / 2}
+                width={boxW}
+                height={boxH}
+                pointerEvents="none"
+                style={{ overflow: "visible" }}
+              >
+                <div className="flex h-full w-full items-center justify-center">
+                  <div className="max-w-[158px] rounded-[10px] border border-gray-200 bg-white px-3 py-1.5 text-center shadow-[0_2px_8px_rgba(15,23,42,0.18)]">
+                    <div className="text-xs font-semibold leading-tight text-gray-500">
+                      {active.section.name}
+                    </div>
+                    <div className="mt-0.5 text-[15px] font-extrabold leading-tight text-midnight">
+                      from ${active.section.price}
+                    </div>
+                  </div>
+                </div>
+              </foreignObject>
+            );
+          })()}
       </svg>
 
       {/* Legend */}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
         <span className="text-xs font-semibold text-gray-500">$ Cheaper</span>
-        <div
-          className="h-2.5 w-36 rounded-full sm:w-44"
-          style={{ background: "linear-gradient(90deg, hsl(158 100% 33%), hsl(98 96% 44%), hsl(39 91% 55%))" }}
-        />
+        <div className="h-2.5 w-36 rounded-full sm:w-44" style={{ background: LEGEND_GRADIENT }} />
         <span className="text-xs font-semibold text-gray-500">Pricier $$$</span>
       </div>
       <p className="mt-2 text-center text-xs text-gray-400">
