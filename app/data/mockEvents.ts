@@ -137,17 +137,18 @@ function buildArenaSections(fromPrice: number, sport: Sport): Section[] {
 // The two long sidelines each split into Left / Center (50-yard line) / Right;
 // the two short ends are End Zones; plus 4 corners. The StadiumMap positions each
 // section by its id slug, so this order is not load-bearing. Pricing hierarchy:
-// Sideline Center (50-yard) > Sideline L/R > End Zone > Corner.
-// pf: corner 0 → end zone 0.25 → sideline L/R 0.7 → sideline center 1.
+// Sideline Center (50-yard) > Sideline L/R >> End Zone > Corner — end zones sit
+// far below the sidelines (~half price), the true behind-the-goal bargain, so
+// pf jumps from 0.08 (end zone) to 0.82 (sideline L/R).
 const STADIUM_POSITIONS: { suffix: string; slug: string; pf: number }[] = [
   { suffix: "Sideline Near (Center)", slug: "sideline-near-center", pf: 1 },
   { suffix: "Sideline Far (Center)", slug: "sideline-far-center", pf: 1 },
-  { suffix: "Sideline Near (Left)", slug: "sideline-near-left", pf: 0.7 },
-  { suffix: "Sideline Near (Right)", slug: "sideline-near-right", pf: 0.7 },
-  { suffix: "Sideline Far (Left)", slug: "sideline-far-left", pf: 0.7 },
-  { suffix: "Sideline Far (Right)", slug: "sideline-far-right", pf: 0.7 },
-  { suffix: "End Zone (Left)", slug: "endzone-left", pf: 0.25 },
-  { suffix: "End Zone (Right)", slug: "endzone-right", pf: 0.25 },
+  { suffix: "Sideline Near (Left)", slug: "sideline-near-left", pf: 0.82 },
+  { suffix: "Sideline Near (Right)", slug: "sideline-near-right", pf: 0.82 },
+  { suffix: "Sideline Far (Left)", slug: "sideline-far-left", pf: 0.82 },
+  { suffix: "Sideline Far (Right)", slug: "sideline-far-right", pf: 0.82 },
+  { suffix: "End Zone (Left)", slug: "endzone-left", pf: 0.08 },
+  { suffix: "End Zone (Right)", slug: "endzone-right", pf: 0.08 },
   { suffix: "Corner (Near Left)", slug: "corner-near-left", pf: 0 },
   { suffix: "Corner (Near Right)", slug: "corner-near-right", pf: 0 },
   { suffix: "Corner (Far Left)", slug: "corner-far-left", pf: 0 },
@@ -158,10 +159,11 @@ function buildStadiumSections(fromPrice: number): Section[] {
   const sections: Section[] = [];
   let seed = 0;
   // base = corner (pf 0) multiplier; base + spread = 50-yard-line (pf 1) multiplier.
+  // The big spread pushes sidelines well above the near-the-corner end zones.
   const tiers: { level: SectionLevel; base: number; spread: number }[] = [
-    { level: "Lower", base: 2.6, spread: 2.0 }, // corner 2.6x, end 3.1x, side 4.0x, center 4.6x
-    { level: "Club", base: 1.7, spread: 0.85 },
-    { level: "Upper", base: 1.0, spread: 0.6 },
+    { level: "Lower", base: 2.3, spread: 2.9 }, // corner 2.3x, end 2.53x, side 4.68x, center 5.2x
+    { level: "Club", base: 1.5, spread: 1.55 }, // corner 1.5x, end 1.62x, side 2.77x, center 3.05x
+    { level: "Upper", base: 1.0, spread: 0.95 }, // corner 1.0x, end 1.08x, side 1.78x, center 1.95x
   ];
   tiers.forEach(({ level, base, spread }) => {
     STADIUM_POSITIONS.forEach((pos) => {
