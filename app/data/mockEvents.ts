@@ -133,6 +133,51 @@ function buildArenaSections(fromPrice: number, sport: Sport): Section[] {
   return sections;
 }
 
+// A football/soccer STADIUM bowl: 12 sections per tier around an elongated field.
+// The two long sidelines each split into Left / Center (50-yard line) / Right;
+// the two short ends are End Zones; plus 4 corners. The StadiumMap positions each
+// section by its id slug, so this order is not load-bearing. Pricing hierarchy:
+// Sideline Center (50-yard) > Sideline L/R > End Zone > Corner.
+// pf: corner 0 → end zone 0.25 → sideline L/R 0.7 → sideline center 1.
+const STADIUM_POSITIONS: { suffix: string; slug: string; pf: number }[] = [
+  { suffix: "Sideline Near (Center)", slug: "sideline-near-center", pf: 1 },
+  { suffix: "Sideline Far (Center)", slug: "sideline-far-center", pf: 1 },
+  { suffix: "Sideline Near (Left)", slug: "sideline-near-left", pf: 0.7 },
+  { suffix: "Sideline Near (Right)", slug: "sideline-near-right", pf: 0.7 },
+  { suffix: "Sideline Far (Left)", slug: "sideline-far-left", pf: 0.7 },
+  { suffix: "Sideline Far (Right)", slug: "sideline-far-right", pf: 0.7 },
+  { suffix: "End Zone (Left)", slug: "endzone-left", pf: 0.25 },
+  { suffix: "End Zone (Right)", slug: "endzone-right", pf: 0.25 },
+  { suffix: "Corner (Near Left)", slug: "corner-near-left", pf: 0 },
+  { suffix: "Corner (Near Right)", slug: "corner-near-right", pf: 0 },
+  { suffix: "Corner (Far Left)", slug: "corner-far-left", pf: 0 },
+  { suffix: "Corner (Far Right)", slug: "corner-far-right", pf: 0 },
+];
+
+function buildStadiumSections(fromPrice: number): Section[] {
+  const sections: Section[] = [];
+  let seed = 0;
+  // base = corner (pf 0) multiplier; base + spread = 50-yard-line (pf 1) multiplier.
+  const tiers: { level: SectionLevel; base: number; spread: number }[] = [
+    { level: "Lower", base: 2.6, spread: 2.0 }, // corner 2.6x, end 3.1x, side 4.0x, center 4.6x
+    { level: "Club", base: 1.7, spread: 0.85 },
+    { level: "Upper", base: 1.0, spread: 0.6 },
+  ];
+  tiers.forEach(({ level, base, spread }) => {
+    STADIUM_POSITIONS.forEach((pos) => {
+      const price = Math.round(fromPrice * (base + spread * pos.pf));
+      sections.push({
+        id: `${level.toLowerCase()}-${pos.slug}`,
+        name: `${level} ${pos.suffix}`,
+        level,
+        price,
+        platforms: sectionPlatforms(price, seed++),
+      });
+    });
+  });
+  return sections;
+}
+
 export interface SeatEvent {
   id: string;
   name: string;
@@ -539,6 +584,42 @@ const eventsWithoutSections: Omit<SeatEvent, "sections" | "venueType" | "sport">
       ],
     },
   },
+  {
+    id: "nycfc-vs-inter-miami-yankee",
+    name: "NYCFC vs Inter Miami",
+    category: "sports",
+    date: "2026-10-10",
+    time: "3:00 PM",
+    venue: "Yankee Stadium",
+    city: "New York, NY",
+    fromPrice: 72,
+    platforms: [
+      { platform: "SeatGeek", price: 72 },
+      { platform: "Ticketmaster", price: 91 },
+      { platform: "Vivid Seats", price: 80 },
+      { platform: "StubHub", price: 85 },
+    ],
+    prediction: {
+      recommendation: "buy",
+      confidence: "High",
+      reasoning:
+        "A Messi visit has pushed demand up sharply, and prices have climbed every week since the schedule dropped.",
+      priceHistory: [
+        { date: "May 4", price: 54 },
+        { date: "May 11", price: 56 },
+        { date: "May 18", price: 59 },
+        { date: "May 25", price: 58 },
+        { date: "Jun 1", price: 61 },
+        { date: "Jun 8", price: 63 },
+        { date: "Jun 15", price: 62 },
+        { date: "Jun 22", price: 66 },
+        { date: "Jun 29", price: 68 },
+        { date: "Jul 6", price: 69 },
+        { date: "Jul 13", price: 71 },
+        { date: "Jul 20", price: 72 },
+      ],
+    },
+  },
 ];
 
 // Venue type per event — concerts, basketball/hockey arenas, football stadiums,
@@ -556,6 +637,7 @@ const VENUE_TYPE: Record<string, VenueType> = {
   "sabrina-carpenter-kia": "concert",
   "heat-vs-bucks-kaseya": "arena",
   "rangers-vs-bruins-msg": "arena",
+  "nycfc-vs-inter-miami-yankee": "stadium",
 };
 
 // Sport for arena events — drives COURT vs RINK and basketball vs hockey names.
@@ -577,7 +659,9 @@ export const mockEvents: SeatEvent[] = eventsWithoutSections.map((event) => {
     sections:
       venueType === "arena"
         ? buildArenaSections(event.fromPrice, sport ?? "basketball")
-        : buildConcertSections(event.fromPrice),
+        : venueType === "stadium"
+          ? buildStadiumSections(event.fromPrice)
+          : buildConcertSections(event.fromPrice),
   };
 });
 

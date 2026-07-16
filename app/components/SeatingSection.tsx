@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { StadiumMap } from "./StadiumMap";
+import { ConcertMap } from "./ConcertMap";
 import { ArenaMap } from "./ArenaMap";
+import { StadiumMap } from "./StadiumMap";
 import { PricePanel } from "./PricePanel";
 import type { SeatEvent } from "../data/mockEvents";
 
-// Map each venue type to its seating-map component. "stadium"/"baseline" fall
-// back to the concert map until their own maps are built.
+// Map each venue type to its seating-map component. "baseball" falls back to the
+// concert map until its own map is built.
 const MAP_BY_VENUE = {
-  concert: StadiumMap,
+  concert: ConcertMap,
   arena: ArenaMap,
   stadium: StadiumMap,
-  baseball: StadiumMap,
+  baseball: ConcertMap,
 } as const;
 
 export function SeatingSection({
@@ -27,7 +28,7 @@ export function SeatingSection({
     ? event.sections.find((s) => s.id === selectedId) ?? null
     : null;
 
-  const SeatMap = MAP_BY_VENUE[event.venueType] ?? StadiumMap;
+  const SeatMap = MAP_BY_VENUE[event.venueType] ?? ConcertMap;
 
   return (
     <section className="mt-10 grid gap-8 lg:grid-cols-2 lg:items-start lg:gap-12">
